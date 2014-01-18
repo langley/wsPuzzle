@@ -9,3 +9,5 @@ libraryDependencies ++= Seq(
 )     
 
 play.Project.playScalaSettings
+
+EclipseKeys.withSource := true

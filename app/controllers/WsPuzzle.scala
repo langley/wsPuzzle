@@ -25,10 +25,16 @@ object WsPuzzle extends Controller  {
     // WS doesn't end the iteratee so w/out the channelForIteratee.eofAndEnd the response never terminates
     val postResultFuture = WS.url(remoteUrl).postAndRetrieveStream(request.body.asJson.getOrElse(new JsObject(Seq()))){ 
       headers => resultIteratee 
-    }.map {it => channelForIteratee.eofAndEnd; it.run }
-    Future { 
-      Ok.chunked(resultEnumerator).withHeaders(("Content-Type" -> "text/plain"))
-    }
+    }.map {it =>  
+   	  resultIteratee.run
+      val x = Await.result (
+        Future { 
+          Ok.chunked(resultEnumerator).withHeaders(("Content-Type" -> "text/plain"))
+        }, 2 seconds
+      )
+      x
+    }// .andThen{case r => channelForIteratee.eofAndEnd; }
+    postResultFuture
   }
 
   // Called from my wsPostWithIterators action as a test. This is just a test fixture
