@@ -6,11 +6,11 @@
 # GET     /                           controllers.Application.index
 
 # Test points for WsPuzzle just hit "/" and you'll see intermitent failures
-GET		/							controllers.WsPuzzle.getPostEndpoint(remoteUrl="http://localhost:9000/postTestEndpoint")
-GET		/stream						controllers.WsPuzzle.getPostEndpoint(remoteUrl="http://localhost:9000/postTestEndpointWithStream")
+GET		/							controllers.WsPuzzle.getPostEndpoint
 POST	/wsPostWithIterators		controllers.WsPuzzle.wsPostWithIterators(remoteUrl="http://localhost:9000/postTestEndpoint")
-POST	/postTestEndpointWithStream  controllers.WsPuzzle.wsPostWithIteratorsWithStream(remoteUrl="http://localhost:9000/postTestEndpoint")
 POST	/postTestEndpoint			controllers.WsPuzzle.postTestEndpoint
+GET		/getPostEndpoint			controllers.WsPuzzle.getPostEndpoint
+
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)
