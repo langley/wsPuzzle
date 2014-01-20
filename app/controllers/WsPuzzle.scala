@@ -17,32 +17,29 @@ import scala.language.postfixOps
 
 object WsPuzzle extends Controller  {
   // Invoke a WS as a post
-  def wsPostWithIterators(remoteUrl: String) = Action.async { implicit request =>
+  def wsPostWithIteratee(remoteUrl: String) = Action { implicit request =>
     // create a channel that is connected to an enumerator which is returned in the result
     val (resultEnumerator, channelForIteratee) = Concurrent.broadcast[Array[Byte]]
     channelForIteratee.push("Never an empty enumerator".getBytes)
     // define our consumer a.k.a. our iteratee -- It just pushes into the channel for the enumerator returned in the response
-    val resultIteratee = Iteratee.foreach[Array[Byte]] { chunk =>  channelForIteratee.push(chunk)   }
+    val resultIteratee = Iteratee.foreach[Array[Byte]] { chunk =>  channelForIteratee.push(chunk)  }
     // WS doesn't end the iteratee so w/out the channelForIteratee.eofAndEnd the response never terminates
     val postResultFuture = WS.url(remoteUrl).postAndRetrieveStream(request.body.asJson.getOrElse(new JsObject(Seq()))) { 
-      headers => resultIteratee 
-    }.map {it =>  
-        channelForIteratee.push(Input.EOF)
-        Future{ it.run }
-    }
-    Await.result(postResultFuture, 2 seconds)
-    Future { Ok.chunked(resultEnumerator).withHeaders(("Content-Type" -> "text/plain")) }
+      headers => resultIteratee
+    }.map { it => channelForIteratee.push(Input.EOF) } 
+    // Ok.chunked(resultEnumerator).withHeaders(("Content-Type" -> "text/plain"))
+    SimpleResult(ResponseHeader(200), resultEnumerator, HttpConnection.KeepAlive)
   }
   
-  def wsPostWithIteratorsWithStream(remoteUrl: String) = Action { implicit request =>
+  def wsPostWithStream(remoteUrl: String) = Action { implicit request =>
     import java.io.{OutputStream, BufferedOutputStream, FileOutputStream, ByteArrayOutputStream}
 	val outputStream: OutputStream = new ByteArrayOutputStream()
 	outputStream.write("We always have a non-empty stream. ".getBytes());
-	def fromStream(stream: OutputStream): Iteratee[Array[Byte], Unit] = Cont {
+	def fromStream(stream: OutputStream): Iteratee[Array[Byte], Array[Byte]] = Cont {
 	  case e@Input.EOF =>
 	    stream.flush(); stream.close()
-	    Logger.info(s"iteratee is at EOF, outputStream contents = ${outputStream}")
-	    Done((), e)
+	    Logger.info(s"iteratee is at EOF, outputStream contents = |||${outputStream}|||")
+	    Done(outputStream.toString.getBytes, e)
 	  case Input.El(data) =>
 	    Logger.info(s">>> data pushed into stream = ${new String(data)}")
 	    stream.write(data)
@@ -52,11 +49,11 @@ object WsPuzzle extends Controller  {
 	}
 	val futureResponse = WS.url(remoteUrl).postAndRetrieveStream(request.body.asJson.getOrElse(new JsObject(Seq()))) {
 	  headers => fromStream(outputStream)
-	}.map {it8ee => Future {it8ee.run} }
+	}.map {it => it.run}
 	Await.result(futureResponse, 2 seconds)
 	val out = outputStream.toString
 	Logger.info(">>>> out = " + out)
-	Ok(outputStream.toString())
+	SimpleResult(ResponseHeader(200), Enumerator(outputStream.toString.getBytes), HttpConnection.KeepAlive)
   }
 
   // Called from my wsPostWithIterators action as a test. This is just a test fixture
