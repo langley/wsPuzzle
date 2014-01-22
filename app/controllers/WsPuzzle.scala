@@ -54,10 +54,12 @@ object WsPuzzle extends Controller  {
   // Invoke a WS as a post -- Creates a response that honors back pressure from the WS call
   // without ever having to read all the response into memory, block or be bound to a thread!
   // 
-  // This is a fixed version of the above that honors back pressure of the WS as well 
-  // by creating a joined enumerator and iteratee. The code then creates a new iteratee 
-  // linked through to the first using Enumeratee.map which essentially allows us to define
-  // a call back. Note all the "New, before, after" decoration is just so you can see
+  // This fixed version of the above creates a joined enumerator and iteratee. 
+  // It then creates a new iteratee linked through to the first using Enumeratee.map 
+  // which essentially allows us to define a call back. The result is that we can 
+  // create a "consumer" aka iteratee and have what we consume come out a producer 
+  // aka a enumerator and transform it along the way. 
+  // Note: the "New, before, after" decorations are just so you can see
   // what's going on and it illustrates the flaws with original design being fixed. 
   def wsPostWithIterators(remoteUrl: String) = Action { implicit request =>
   	val (iteratee, enumerator) = Concurrent.joined[Array[Byte]]
