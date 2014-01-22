@@ -16,25 +16,30 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
 
 object WsPuzzle extends Controller  {
-  // Invoke a WS as a post
-  def wsPostWithIterators(remoteUrl: String) = Action.async { implicit request =>
+  // Invoke a WS as a post -- I believe this shows a bug. 
+  // I believe you should see 
+  // "New before here is a response @ Tue Jan 21 20:58:06 EST 2014 and your body was: AnyContentAsJson({}) after "
+  // BUT, most often you get a 0 byte response, or a "before" response
+  // Rarely you'll get 
+  // "before here is a response @ Tue Jan 21 20:58:06 EST 2014 and your body was: AnyContentAsJson({}) after "
+  // Any way you cut it, this is non-deterministic. My guess is that it's race condition. 
+  // (Perhaps it arises due to my misunderstanding the APIs in use; either way, there's a race somewhere) 
+  def wsPostWithIterators(remoteUrl: String) = Action { implicit request =>
     // create a channel that is connected to an enumerator which is returned in the result
     val (resultEnumerator, channelForIteratee) = Concurrent.broadcast[Array[Byte]]
+    channelForIteratee.push("New ".getBytes)
     // define our consumer a.k.a. our iteratee -- It just pushes into the channel for the enumerator returned in the response
-    val resultIteratee = Iteratee.foreach[Array[Byte]] { chunk =>  channelForIteratee.push(chunk)   }
+    val resultIteratee = Iteratee.foreach[Array[Byte]] { chunk =>
+      channelForIteratee.push("before ".getBytes)
+      channelForIteratee.push(chunk)   
+      channelForIteratee.push(" after ".getBytes)
+    }
     // WS doesn't end the iteratee so w/out the channelForIteratee.eofAndEnd the response never terminates
     val postResultFuture = WS.url(remoteUrl).postAndRetrieveStream(request.body.asJson.getOrElse(new JsObject(Seq()))){ 
       headers => resultIteratee 
-    }.map {it =>  
-   	  resultIteratee.run
-      val x = Await.result (
-        Future { 
-          Ok.chunked(resultEnumerator).withHeaders(("Content-Type" -> "text/plain"))
-        }, 2 seconds
-      )
-      x
-    }// .andThen{case r => channelForIteratee.eofAndEnd; }
-    postResultFuture
+    }.map {it => channelForIteratee.eofAndEnd }
+
+    Ok.chunked(resultEnumerator).withHeaders(("Content-Type" -> "text/plain"))
   }
 
   // Called from my wsPostWithIterators action as a test. This is just a test fixture
