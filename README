@@ -1,4 +1,12 @@
-This is your new Play application
+WsPuzzle: How do we use Itertees/Enumerators the right way in a Play web service?
 =====================================
 
-This file will be packaged with your application, when using `play dist`.
+The puzzle can basically be expressed as "How do we create a web service that invokes another web service with a POST request and use the Play Iteratee/Enumerator framework to deliver the response"? 
+
+The original code illustrates a lack of understanding of how the Concurrent.broadcast pair of Enumerator/Iteratee works. Comments in the code explain the flaw in understanding and why the solution addresses it. 
+
+The solution illustrates how to create a web service that can POST to another web service, retrieve the results and send them back to the original client in a non-blocking, non-threaded way w/out having to read the whole response into memory first! 
+
+This short solution illustrates the power and elegance of  Iteratees/Enumeratees/Enumerators in a concrete way within a functioning Play! web application. 
+
+**Props to James Roper for clarifying how to implement this!** 
